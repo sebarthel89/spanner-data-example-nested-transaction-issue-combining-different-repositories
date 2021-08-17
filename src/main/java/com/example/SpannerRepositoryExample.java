@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gcp.data.spanner.core.admin.SpannerDatabaseAdminTemplate;
 import org.springframework.cloud.gcp.data.spanner.core.admin.SpannerSchemaUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Example repository usage.
@@ -59,6 +60,7 @@ public class SpannerRepositoryExample {
     }
   }
 
+  @Transactional
   void runReadWriteTransactionExample() {
     createTablesIfNotExists();
     this.traderRepository.deleteAll();
@@ -66,10 +68,10 @@ public class SpannerRepositoryExample {
 
 
     // Open a single transaction
-    this.traderRepository.performReadWriteTransaction(transactionTradeRepository -> {
+    this.traderRepository.performReadWriteTransaction(transactionTraderRepository -> {
 
       // save a trader
-      transactionTradeRepository.save(new Trader("demo_trader1", "John", "Doe"));
+      transactionTraderRepository.save(new Trader("demo_trader1", "John", "Doe"));
 
       // save a trade
       // this causes a com.google.cloud.spanner.SpannerException: INTERNAL: Nested transactions are not supported
