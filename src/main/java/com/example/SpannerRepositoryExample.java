@@ -64,28 +64,18 @@ public class SpannerRepositoryExample {
     this.traderRepository.deleteAll();
     this.tradeRepository.deleteAll();
 
-    this.traderRepository.save(new Trader("demo_trader1", "John", "Doe"));
-    this.tradeRepository
-        .save(new Trade("1", "BUY", 100.0, 50.0, "STOCK1", "demo_trader1",
-            Arrays.asList(99.0, 101.00)));
 
-    this.tradeRepository.performReadWriteTransaction(transactionTradeRepository -> {
+    // Open a single transaction
+    this.traderRepository.performReadWriteTransaction(transactionTradeRepository -> {
 
-      // using the transaction repository is not possible because of nested transactions
-      // that are not allowed
-      //
-      // if you comment this in you will get
-      // com.google.cloud.spanner.SpannerException: INTERNAL: Nested transactions are not supported
-      // tradeRepository.deleteByAction("BUY");
+      // save a trader
+      transactionTradeRepository.save(new Trader("demo_trader1", "John", "Doe"));
 
-      //a workaround is to get somehow the data, do the filtering in java, and execute a delete operation
-      //this should be easier and also comes with other scaling issues
-//      Iterable<Trade> allTrades = transactionTradeRepository.findAll();
-//      StreamSupport.stream(allTrades.spliterator(), false)
-//          .filter(record -> record.getAction().equals("BUY"))
-//          .forEach(transactionTradeRepository::delete);
-      TradeRepository customRepo = (TradeRepository) transactionTradeRepository;
-      customRepo.deleteByAction("BUY");
+      // save a trade
+      // this causes a com.google.cloud.spanner.SpannerException: INTERNAL: Nested transactions are not supported
+      this.tradeRepository
+          .save(new Trade("1", "BUY", 100.0, 50.0, "STOCK1", "demo_trader1",
+              Arrays.asList(99.0, 101.00)));
 
       return null;
     });
