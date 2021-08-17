@@ -1,0 +1,89 @@
+= Spring Cloud GCP Cloud Spanner Example For ReadWriteTransaction issues
+
+This code sample demonstrates that you are forced to use SpannerRepository base methods in case
+of you open a read-write transaction. In case you don't use the provided parameter, and use
+the actual repository instead, then the already opened transaction is not recognized and the result is a nested
+transaction that is not supported.
+
+Anyhow, *the target should be to create a single transaction using the custom repository methods
+of an application. This should be easy and is one of the most use cases for spanner data.*
+
+== Running the example
+
+Simplest solution is the setup the emulator like using for example this script:
+
+
+```
+#!/usr/bin/env bash
+
+set -e
+
+# check if gcloud is installed
+if ! command -v gcloud &> /dev/null
+then
+    echo "Please install gcloud to run this script"
+    exit
+fi
+
+#
+# create gcloud dev profile
+#
+
+# check if the profile already exists
+configListResult=$(gcloud config configurations list)
+if [[ ! $configListResult == *"emualtor"* ]]; then
+  echo "'emualtor' profile not found, creating..."
+
+  gcloud config configurations create emualtor
+  gcloud auth login
+  gcloud config set project emualtor
+  gcloud auth application-default login
+
+fi
+
+
+# start emulator when not running
+imageName='gcr.io/cloud-spanner-emulator/emulator'
+emulatorImageRunningResult=$(docker ps | awk '{split($2,image,":"); print $1, image[1]}')
+
+if [[ ! $emulatorImageRunningResult == *$imageName* ]]; then
+  echo "Emulator not running, starting..."
+
+  # check if image is stopped
+  emulatorAllImagesResult=$(docker ps -a | awk '{split($2,image,":"); print $1, image[1]}')
+
+  # start new container
+  if [[ ! $emulatorAllImagesResult == *$imageName* ]]; then
+    echo "No stopped containers found, starting new container..."
+    docker run -d -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator
+  fi
+
+  # start existing container
+  if [[ $emulatorAllImagesResult == *$imageName* ]]; then
+    echo "Stopped container found, starting existing container..."
+    docker start $(docker ps -a | awk '{split($2,image,":"); print $1, image[1]}' | awk -v image=$imageName '$2 == image {print $1}')
+  fi
+fi
+
+gcloud config configurations activate emualtor
+gcloud config set project emualtor
+gcloud config set auth/disable_credentials true
+gcloud config set api_endpoint_overrides/spanner http://localhost:9020/
+
+# create spanner instance if not exists
+spannerInstanceResult=$(gcloud spanner instances list)
+if [[ ! $spannerInstanceResult == *"spring-demo"* ]]; then
+  echo "No local spanner instance found, creating..."
+
+  gcloud spanner instances create spring-demo \
+   --config=emualtor --description="Local spanner instance for spring-demo" --nodes=1
+
+   gcloud spanner databases create trades --instance spring-demo
+fi
+
+
+```
+
+You can also connect to a real spanner. In this case, make sure to enable authentication by
+removing the `NoCredentialsProvider` bean from `SpannerExampleDriver.java` and updating the
+`application.properties` to your needs.
